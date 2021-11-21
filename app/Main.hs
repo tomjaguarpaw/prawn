@@ -8,7 +8,7 @@ module Main where
 import System.Process.Typed (ProcessConfig, readProcess, setStdin, nullStream, proc)
 import System.Environment (getArgs)
 import System.Exit (ExitCode(ExitSuccess, ExitFailure))
-import Data.ByteString (putStr)
+import Data.ByteString (putStr, ByteString)
 import Data.ByteString.Lazy (toStrict)
 import Control.Applicative ((<|>))
 import Data.String (fromString, IsString)
@@ -98,6 +98,16 @@ refType ref =
 colorRef :: RefType -> (Colored -> Colored)
 colorRef = Colored . \case { Head -> Green; Remote -> Red; Tag -> Yellow }
 
+newtype GitDir = UnsafeGitDir { unGitDir :: FilePath }
+
+getGitDir :: FilePath -> ExceptT String IO (Maybe GitDir)
+getGitDir filepath = do
+  (exitCode, stdout) <- run (proc "git" ["-C", filepath, "rev-parse", "--absolute-git-dir"])
+
+  pure $ case exitCode of
+    ExitFailure _ -> Nothing
+    ExitSuccess -> Just (UnsafeGitDir (unpack stdout))
+
 -- Test case:
 --
 -- git describe --all --long
@@ -121,9 +131,9 @@ parseGitDescribe stdout =
 
       _ -> Left "Expected three components separated by dashes"
 
-before :: String -> ExceptT String IO (Maybe Before)
+before :: GitDir -> ExceptT String IO (Maybe Before)
 before gitDir = do
-  (exitCode, stdout) <- run (proc "git" ["-C", gitDir, "describe", "--all", "--long"])
+  (exitCode, stdout) <- run (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--long"])
 
   case exitCode of
     ExitSuccess -> case parseGitDescribe stdout of
@@ -167,9 +177,9 @@ parseGitDescribeContains stdout = do
 
   pure (mRefType, shortRef, distance)
 
-after :: String -> ExceptT String IO (Maybe Colored)
+after :: GitDir -> ExceptT String IO (Maybe Colored)
 after gitDir = do
-  (exitCode, stdout) <- run (proc "git" ["-C", gitDir, "describe", "--all", "--contains"])
+  (exitCode, stdout) <- run (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--contains"])
 
   case exitCode of
     ExitSuccess -> case parseGitDescribeContains stdout of
@@ -189,9 +199,9 @@ after gitDir = do
     -- conditions
     ExitFailure _ -> pure Nothing
 
-checkedOutBranch :: String -> ExceptT String IO (Maybe Colored)
+checkedOutBranch :: GitDir -> ExceptT String IO (Maybe Colored)
 checkedOutBranch gitDir = do
-  (exitCode, stdout) <- run (proc "git" ["-C", gitDir, "symbolic-ref", "HEAD"])
+  (exitCode, stdout) <- run (proc "git" ["-C", unGitDir gitDir, "symbolic-ref", "HEAD"])
 
   case exitCode of
     ExitSuccess -> case stripPrefix (fromString "refs/heads/") stdout of
@@ -202,27 +212,29 @@ checkedOutBranch gitDir = do
 main :: IO ()
 main = do
   r <- runExceptT $ do
-    gitDir <- lift System.Environment.getArgs >>= \case
-      [gitDir] -> pure gitDir
-      _ -> throwE "Need exactly one argument"
+    lift System.Environment.getArgs >>= \case
+      [] -> throwE "Need exactly one argument"
+      (_:_:_) -> throwE "Need exactly one argument"
+      [path] -> getGitDir path >>= \case
+        Nothing -> pure ()
+        Just gitDir -> do
+          let branch = Colored Cyan (Plain (fromString "HEAD"))
 
-    let branch = Colored Cyan (Plain (fromString "HEAD"))
+          toDisplay <- checkedOutBranch gitDir >>= \case
+            Just branchName -> pure $ branch <> fromString "=" <> branchName
 
-    toDisplay <- checkedOutBranch gitDir >>= \case
-      Just branchName -> pure $ branch <> fromString "=" <> branchName
+            Nothing -> do
+              beforeStr <- before gitDir
+              afterStr  <- after gitDir
 
-      Nothing -> do
-        beforeStr <- before gitDir
-        afterStr  <- after gitDir
+              pure $ case (beforeStr, afterStr) of
+                (Nothing, Nothing) -> fromString ""
+                (Just (At b), _) -> branch <> fromString "@" <> b
+                (Just (Before b), Nothing) -> b <> fromString "-" <> branch
+                (Nothing, Just a) -> branch <> fromString "-" <> a
+                (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
 
-        pure $ case (beforeStr, afterStr) of
-          (Nothing, Nothing) -> fromString ""
-          (Just (At b), _) -> branch <> fromString "@" <> b
-          (Just (Before b), Nothing) -> b <> fromString "-" <> branch
-          (Nothing, Just a) -> branch <> fromString "-" <> a
-          (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
-
-    lift (putColoredVT100 toDisplay)
+          lift (putColoredVT100 toDisplay)
 
   case r of
     Left l -> Prelude.putStrLn l
