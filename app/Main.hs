@@ -208,19 +208,21 @@ main = do
 
     let branch = Colored Cyan (Plain (fromString "HEAD"))
 
-    checkedOutBranch gitDir >>= \case
-      Just branchName -> lift (putColoredVT100 (branch <> fromString "=" <> branchName))
+    toDisplay <- checkedOutBranch gitDir >>= \case
+      Just branchName -> pure $ branch <> fromString "=" <> branchName
 
       Nothing -> do
         beforeStr <- before gitDir
         afterStr  <- after gitDir
 
-        lift $ putColoredVT100 $ case (beforeStr, afterStr) of
+        pure $ case (beforeStr, afterStr) of
           (Nothing, Nothing) -> fromString ""
           (Just (At b), _) -> branch <> fromString "@" <> b
           (Just (Before b), Nothing) -> b <> fromString "-" <> branch
           (Nothing, Just a) -> branch <> fromString "-" <> a
           (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
+
+    lift (putColoredVT100 toDisplay)
 
   case r of
     Left l -> Prelude.putStrLn l
