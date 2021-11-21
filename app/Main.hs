@@ -141,23 +141,13 @@ before gitDir = do
     -- conditions
     ExitFailure _ -> pure Nothing
 
--- If we are on branch "master" then
+-- Test cases:
 --
 -- $ git describe --all --contains
 -- master
 --
--- If we are one commit master "master" then
---
 -- $ git describe --all --contains
 -- master~1
---
--- 1. In the first case we don't get a "~".  That's OK.  It's not
--- possible for that to be in a branch name anyway.  In any case, we
--- will ignore it because "before" we will tell us we are on "master".
---
--- 2. In the second case we don't get "heads/" before the name.  Even
--- --long does not help.  Perhaps we should just assume we are a head
--- if we get nothing there.
 parseGitDescribeContains :: Text -> Either String (Maybe RefType, Text, Int)
 parseGitDescribeContains stdout = do
   (ref, distance) <- case Prelude.reverse (split (== '~') stdout) of
