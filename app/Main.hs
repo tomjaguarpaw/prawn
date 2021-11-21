@@ -189,6 +189,16 @@ after gitDir = do
     -- conditions
     ExitFailure _ -> pure Nothing
 
+checkedOutBranch :: String -> ExceptT String IO (Maybe Colored)
+checkedOutBranch gitDir = do
+  (exitCode, stdout) <- run (proc "git" ["-C", gitDir, "symbolic-ref", "HEAD"])
+
+  case exitCode of
+    ExitSuccess -> case stripPrefix (fromString "refs/heads/") stdout of
+      Nothing -> throwE ("Expected to start with refs/heads but got: " <> unpack stdout)
+      Just branchName -> pure (Just (Colored Green (Plain branchName)))
+    ExitFailure _ -> pure Nothing
+
 main :: IO ()
 main = do
   r <- runExceptT $ do
@@ -196,17 +206,21 @@ main = do
       [gitDir] -> pure gitDir
       _ -> throwE "Need exactly one argument"
 
-    beforeStr <- before gitDir
-    afterStr  <- after gitDir
-
     let branch = Colored Cyan (Plain (fromString "HEAD"))
 
-    lift $ putColoredVT100 $ case (beforeStr, afterStr) of
-      (Nothing, Nothing) -> fromString ""
-      (Just (At b), _) -> branch <> fromString "=" <> b
-      (Just (Before b), Nothing) -> b <> fromString "-" <> branch
-      (Nothing, Just a) -> branch <> fromString "-" <> a
-      (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
+    checkedOutBranch gitDir >>= \case
+      Just branchName -> lift (putColoredVT100 (branch <> fromString "=" <> branchName))
+
+      Nothing -> do
+        beforeStr <- before gitDir
+        afterStr  <- after gitDir
+
+        lift $ putColoredVT100 $ case (beforeStr, afterStr) of
+          (Nothing, Nothing) -> fromString ""
+          (Just (At b), _) -> branch <> fromString "@" <> b
+          (Just (Before b), Nothing) -> b <> fromString "-" <> branch
+          (Nothing, Just a) -> branch <> fromString "-" <> a
+          (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
 
   case r of
     Left l -> Prelude.putStrLn l
