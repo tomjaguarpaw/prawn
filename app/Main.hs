@@ -13,16 +13,20 @@ import Data.ByteString.Lazy (toStrict)
 import Data.Maybe (fromMaybe)
 import Control.Applicative ((<|>))
 import Data.String (fromString)
-import Data.Text (Text, strip, intercalate, stripPrefix, split)
+import Data.Text (Text, strip, intercalate, stripPrefix, split, unpack)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8')
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, throwE, runExceptT)
+import Text.Read (readMaybe)
 
 putTextUtf8 :: Text -> IO ()
 putTextUtf8 = Data.ByteString.putStr . encodeUtf8
 
 tshow :: Show a => a -> Text
 tshow = fromString . show
+
+treadMaybe :: Read a => Text -> Maybe a
+treadMaybe = readMaybe . unpack
 
 run :: ProcessConfig () () ()
     -> ExceptT String IO (ExitCode, Text)
@@ -35,18 +39,23 @@ run p = do
 
   pure (exitCode, stdout)
 
-before :: String -> ExceptT String IO (Maybe Text)
+data Before = At Text | Before Text
+
+before :: String -> ExceptT String IO (Maybe Before)
 before gitDir = do
   (exitCode, stdout) <- run (proc "git" ["-C", gitDir, "describe", "--all", "--long"])
 
   case exitCode of
     ExitSuccess -> case Prelude.reverse (split (== '-') stdout) of
-      _rev:distance:refParts ->
+      _rev:distanceT:refParts ->
         let ref = intercalate (fromString "-") refParts
             shortRef = fromMaybe ref (stripPrefix (fromString "remotes/") ref
                                       <|> stripPrefix (fromString "heads/") ref)
 
-        in pure (Just (shortRef <> fromString "-" <> distance))
+        in case treadMaybe distanceT :: Maybe Int of
+          Nothing -> throwE ("Couldn't read distance: " <> unpack distanceT)
+          Just 0 -> pure (Just (At shortRef))
+          Just _ -> pure (Just (Before (shortRef <> fromString "-" <> distanceT)))
       _ -> pure Nothing
     -- I don't know a way of distinguishing between the various error
     -- conditions
@@ -85,9 +94,10 @@ main = do
 
     lift $ putTextUtf8 $ case (beforeStr, afterStr) of
       (Nothing, Nothing) -> fromString ""
-      (Just b, Nothing) -> b <> fromString "-ᛘ"
+      (Just (At b), _) -> fromString "ᛘ=" <> b
+      (Just (Before b), Nothing) -> b <> fromString "-ᛘ"
       (Nothing, Just a) -> fromString "ᛘ-" <> a
-      (Just b, Just a) -> b <> fromString "-ᛘ-" <> a
+      (Just (Before b), Just a) -> b <> fromString "-ᛘ-" <> a
 
   case r of
     Left l -> Prelude.putStrLn l
