@@ -176,7 +176,11 @@ after gitDir = do
       Left e -> throwE e
       Right (mRefType, shortRef, distance) ->
         let coloredShortRef = case mRefType of
-              Nothing -> Plain shortRef
+              -- "git describe --all --contains" does not prefix heads
+              -- with "head/".  Therefore if parsing returns an
+              -- unknown ref type we assume it was a head and color it
+              -- accordingly.
+              Nothing -> colorRef Head (Plain shortRef)
               Just refType_ -> colorRef refType_ (Plain shortRef)
 
         in pure (Just (Plain (tshow distance) <> fromString "-" <> coloredShortRef))
