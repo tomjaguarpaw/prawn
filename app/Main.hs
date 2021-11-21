@@ -113,6 +113,8 @@ before gitDir = do
               Nothing -> Plain ref
               Just (refType_, shortRef_) -> colorRef refType_ (Plain shortRef_)
 
+        -- The distance is the number of commits on HEAD that are not
+        -- reachable from the named commit that we found.
         in case treadMaybe distanceT :: Maybe Int of
           Nothing -> throwE ("Couldn't read distance: " <> unpack distanceT)
           Just 0 -> pure (Just (At shortRef))
