@@ -97,29 +97,46 @@ refType ref =
 
 colorRef :: RefType -> (Colored -> Colored)
 colorRef = Colored . \case { Head -> Green; Remote -> Red; Tag -> Yellow }
+
 -- Test case:
 --
 -- git describe --all --long
 -- tags/tag-f72b0d2-0-gf72b0d2
+
+-- We ignore the commit hash.  We can get that in other ways.
+parseGitDescribe :: Text -> Either String (Maybe RefType, Text, Int)
+parseGitDescribe stdout =
+  case Prelude.reverse (split (== '-') stdout) of
+      _rev:distanceT:refParts -> do
+        distance <- case treadMaybe distanceT :: Maybe Int of
+                      Nothing -> Left ("Couldn't read distance: " <> unpack distanceT)
+                      Just d -> pure d
+
+        let ref = intercalate (fromString "-") (reverse refParts)
+            (mRefType, shortRef) = case refType ref of
+              Nothing -> (Nothing, ref)
+              Just (refType_, shortRef_) -> (Just refType_, shortRef_)
+
+        pure (mRefType, shortRef, distance)
+
+      _ -> Left "Expected three components separated by dashes"
+
 before :: String -> ExceptT String IO (Maybe Before)
 before gitDir = do
   (exitCode, stdout) <- run (proc "git" ["-C", gitDir, "describe", "--all", "--long"])
 
   case exitCode of
-    ExitSuccess -> case Prelude.reverse (split (== '-') stdout) of
-      _rev:distanceT:refParts ->
-        let ref = intercalate (fromString "-") (reverse refParts)
-            shortRef = case refType ref of
-              Nothing -> Plain ref
-              Just (refType_, shortRef_) -> colorRef refType_ (Plain shortRef_)
+    ExitSuccess -> case parseGitDescribe stdout of
+      Left e -> throwE e
+      Right (mRefType, shortRef, distance) ->
+        let coloredShortRef = case mRefType of
+              Nothing -> Plain shortRef
+              Just refType_ -> colorRef refType_ (Plain shortRef)
 
-        -- The distance is the number of commits on HEAD that are not
-        -- reachable from the named commit that we found.
-        in case treadMaybe distanceT :: Maybe Int of
-          Nothing -> throwE ("Couldn't read distance: " <> unpack distanceT)
-          Just 0 -> pure (Just (At shortRef))
-          Just _ -> pure (Just (Before (shortRef <> fromString "-" <> Plain distanceT)))
-      _ -> pure Nothing
+        in (pure . Just) $ case distance of
+          0 -> At coloredShortRef
+          _ -> Before (coloredShortRef <> fromString "-" <> Plain (tshow distance))
+
     -- I don't know a way of distinguishing between the various error
     -- conditions
     ExitFailure _ -> pure Nothing
