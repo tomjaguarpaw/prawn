@@ -76,9 +76,14 @@ main = do
       [gitDir] -> pure gitDir
       _ -> throwE "Need exactly one argument"
 
-    (lift . putTextUtf8) =<< fmap (fromMaybe (fromString "")) (before gitDir)
-    (lift . putTextUtf8) (fromString "-ᛘ-")
-    (lift . putTextUtf8) =<< fmap (fromMaybe (fromString "")) (after gitDir)
+    beforeStr <- before gitDir
+    afterStr  <- after gitDir
+
+    lift $ putTextUtf8 $ case (beforeStr, afterStr) of
+      (Nothing, Nothing) -> fromString ""
+      (Just b, Nothing) -> b <> fromString "-ᛘ"
+      (Nothing, Just a) -> fromString "ᛘ-" <> a
+      (Just b, Just a) -> b <> fromString "-ᛘ-" <> a
 
   case r of
     Left l -> Prelude.putStrLn l
