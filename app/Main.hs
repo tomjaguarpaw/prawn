@@ -158,20 +158,39 @@ before gitDir = do
 -- 2. In the second case we don't get "heads/" before the name.  Even
 -- --long does not help.  Perhaps we should just assume we are a head
 -- if we get nothing there.
+parseGitDescribeContains :: Text -> Either String (Maybe RefType, Text, Int)
+parseGitDescribeContains stdout = do
+  (ref, distance) <- case Prelude.reverse (split (== '~') stdout) of
+    [ref] -> pure (ref, 0)
+    distanceT:refParts@(_:_) -> do
+        distance <- case treadMaybe distanceT :: Maybe Int of
+                      Nothing -> Left ("Couldn't read distance: " <> unpack distanceT)
+                      Just d -> pure d
+
+        pure (intercalate (fromString "~") (reverse refParts), distance)
+
+    [] -> Left "Expected non-empty output"
+
+  let (mRefType, shortRef) = case refType ref of
+        Nothing -> (Nothing, ref)
+        Just (refType_, shortRef_) -> (Just refType_, shortRef_)
+
+  pure (mRefType, shortRef, distance)
+
 after :: String -> ExceptT String IO (Maybe Colored)
 after gitDir = do
   (exitCode, stdout) <- run (proc "git" ["-C", gitDir, "describe", "--all", "--contains"])
 
   case exitCode of
-    ExitSuccess -> case Prelude.reverse (split (== '~') stdout) of
-      distance:refParts ->
-        let ref = intercalate (fromString "~") (reverse refParts)
-            shortRef = case refType ref of
-              Nothing -> Plain ref
-              Just (refType_, shortRef_) -> colorRef refType_ (Plain shortRef_)
+    ExitSuccess -> case parseGitDescribeContains stdout of
+      Left e -> throwE e
+      Right (mRefType, shortRef, distance) ->
+        let coloredShortRef = case mRefType of
+              Nothing -> Plain shortRef
+              Just refType_ -> colorRef refType_ (Plain shortRef)
 
-        in pure (Just (Plain distance <> fromString "-" <> shortRef))
-      _ -> pure Nothing
+        in pure (Just (Plain (tshow distance) <> fromString "-" <> coloredShortRef))
+
     -- I don't know a way of distinguishing between the various error
     -- conditions
     ExitFailure _ -> pure Nothing
