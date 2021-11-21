@@ -10,7 +10,6 @@ import System.Environment (getArgs)
 import System.Exit (ExitCode(ExitSuccess, ExitFailure))
 import Data.ByteString (putStr)
 import Data.ByteString.Lazy (toStrict)
-import Data.Maybe (fromMaybe)
 import Control.Applicative ((<|>))
 import Data.String (fromString, IsString)
 import Data.Text (Text, strip, intercalate, stripPrefix, split, unpack)
@@ -127,7 +126,7 @@ before gitDir = do
 --
 -- $ git describe --all --contains --long
 -- remotes/origin/master
-after :: String -> ExceptT String IO (Maybe Text)
+after :: String -> ExceptT String IO (Maybe Colored)
 after gitDir = do
   (exitCode, stdout) <- run (proc "git" ["-C", gitDir, "describe", "--all", "--contains"])
 
@@ -135,10 +134,11 @@ after gitDir = do
     ExitSuccess -> case Prelude.reverse (split (== '~') stdout) of
       distance:refParts ->
         let ref = intercalate (fromString "~") (reverse refParts)
-            shortRef = fromMaybe ref (stripPrefix (fromString "remotes/") ref
-                                      <|> stripPrefix (fromString "heads/") ref)
+            shortRef = case refType ref of
+              Nothing -> Plain ref
+              Just (refType_, shortRef_) -> colorRef refType_ (Plain shortRef_)
 
-        in pure (Just (distance <> fromString "-" <> shortRef))
+        in pure (Just (Plain distance <> fromString "-" <> shortRef))
       _ -> pure Nothing
     -- I don't know a way of distinguishing between the various error
     -- conditions
@@ -160,8 +160,8 @@ main = do
       (Nothing, Nothing) -> fromString ""
       (Just (At b), _) -> branch <> fromString "=" <> b
       (Just (Before b), Nothing) -> b <> fromString "-" <> branch
-      (Nothing, Just a) -> branch <> fromString "-" <> Plain a
-      (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> Plain a
+      (Nothing, Just a) -> branch <> fromString "-" <> a
+      (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
 
   case r of
     Left l -> Prelude.putStrLn l
