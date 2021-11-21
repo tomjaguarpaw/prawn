@@ -154,7 +154,7 @@ main = do
     beforeStr <- before gitDir
     afterStr  <- after gitDir
 
-    let branch = Colored Cyan (Plain (fromString "ᛘ"))
+    let branch = Colored Cyan (Plain (fromString "HEAD"))
 
     lift $ putColoredVT100 $ case (beforeStr, afterStr) of
       (Nothing, Nothing) -> fromString ""
