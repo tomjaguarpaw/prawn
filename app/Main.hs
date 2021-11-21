@@ -52,6 +52,10 @@ before gitDir = do
     -- conditions
     ExitFailure _ -> pure Nothing
 
+-- Unfortunately:
+--
+-- $ git describe --all --contains --long
+-- remotes/origin/master
 after :: String -> ExceptT String IO (Maybe Text)
 after gitDir = do
   (exitCode, stdout) <- run (proc "git" ["-C", gitDir, "describe", "--all", "--contains"])
