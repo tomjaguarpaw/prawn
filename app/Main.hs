@@ -146,7 +146,9 @@ getGitDir filepath = do
 -- tags/tag-f72b0d2-0-gf72b0d2
 
 -- We ignore the commit hash.  We can get that in other ways.
-parseGitDescribe :: Text -> Either String (Maybe RefType, Text, Int)
+parseGitDescribe ::
+  Text ->
+  Either String (Maybe RefType, Text, Int)
 parseGitDescribe stdout =
   case Prelude.reverse (split (== '-') stdout) of
     _rev : distanceT : refParts -> do
