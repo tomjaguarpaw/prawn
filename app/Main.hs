@@ -280,25 +280,25 @@ getArg io ex =
 main :: IO ()
 main = runEffOrExitFailure $ \io success ex -> do
   path <- getArg io ex
-  gitDir <- getGitDir io ex path >>= \case
-    Nothing -> jumpTo success
-    Just gitDir -> pure gitDir
+  gitDir <-
+    getGitDir io ex path >>= \case
+      Nothing -> jumpTo success
+      Just gitDir -> pure gitDir
 
-  do
-      let branch = Colored Cyan (Plain (fromString "HEAD"))
+  let branch = Colored Cyan (Plain (fromString "HEAD"))
 
-      toDisplay <-
-        checkedOutBranch io ex gitDir >>= \case
-          Just branchName -> pure $ branch <> fromString "=" <> branchName
-          Nothing -> do
-            beforeStr <- before io ex gitDir
-            afterStr <- after io ex gitDir
+  toDisplay <-
+    checkedOutBranch io ex gitDir >>= \case
+      Just branchName -> pure $ branch <> fromString "=" <> branchName
+      Nothing -> do
+        beforeStr <- before io ex gitDir
+        afterStr <- after io ex gitDir
 
-            pure $ case (beforeStr, afterStr) of
-              (Nothing, Nothing) -> fromString ""
-              (Just (At b), _) -> branch <> fromString "@" <> b
-              (Just (Before b), Nothing) -> b <> fromString "-" <> branch
-              (Nothing, Just a) -> branch <> fromString "-" <> a
-              (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
+        pure $ case (beforeStr, afterStr) of
+          (Nothing, Nothing) -> fromString ""
+          (Just (At b), _) -> branch <> fromString "@" <> b
+          (Just (Before b), Nothing) -> b <> fromString "-" <> branch
+          (Nothing, Just a) -> branch <> fromString "-" <> a
+          (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
 
-      effIO io (putColoredVT100 toDisplay)
+  effIO io (putColoredVT100 toDisplay)
