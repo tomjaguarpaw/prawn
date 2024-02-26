@@ -243,7 +243,9 @@ after io ex gitDir = do
     -- conditions
     ExitFailure _ -> pure Nothing
 
-checkedOutBranch :: GitDir -> ExceptT String IO (Maybe Colored)
+checkedOutBranch ::
+  GitDir ->
+  ExceptT String IO (Maybe Colored)
 checkedOutBranch gitDir = runExceptTIO $ \io ex -> do
   (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", unGitDir gitDir, "symbolic-ref", "HEAD"])
 
