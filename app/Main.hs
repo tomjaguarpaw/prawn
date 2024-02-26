@@ -1,14 +1,16 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module Main where
 
-import Bluefin.Eff (Eff, runPureEff, (:>))
+import Bluefin.Eff (Eff, runEff, runPureEff, (:&), (:>))
 import Bluefin.Exception (Exception, throw, try)
+import Bluefin.IO (IOE, effIO)
 import Control.Applicative ((<|>))
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
+import Control.Monad.Trans.Except (ExceptT (ExceptT), runExceptT, throwE)
 import Data.ByteString (putStr)
 import Data.ByteString.Lazy (toStrict)
 import Data.String (IsString, fromString)
@@ -75,14 +77,19 @@ tshow = fromString . show
 treadMaybe :: (Read a) => Text -> Maybe a
 treadMaybe = readMaybe . unpack
 
+runExceptTIO ::
+  (forall es e1 e2. IOE e1 -> Exception e e2 -> Eff (e2 :& e1 :& es) r) ->
+  ExceptT e IO r
+runExceptTIO f = ExceptT (runEff $ \io -> try (f io))
+
 run ::
   ProcessConfig () () () ->
   ExceptT String IO (ExitCode, Text)
-run p = do
-  (exitCode, eStdout, _stderr) <- readProcess (setStdin nullStream p)
+run p = runExceptTIO $ \io ex -> do
+  (exitCode, eStdout, _stderr) <- effIO io (readProcess (setStdin nullStream p))
 
   stdout <- case (fmap strip . decodeUtf8' . toStrict) eStdout of
-    Left l -> throwE ("Couldn't decode output: " <> show l)
+    Left l -> throw ex ("Couldn't decode output: " <> show l)
     Right stdout -> pure stdout
 
   pure (exitCode, stdout)
