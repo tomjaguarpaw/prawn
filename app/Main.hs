@@ -6,7 +6,7 @@
 module Main where
 
 import Bluefin.Eff (Eff, runEff, (:&), (:>))
-import Bluefin.Exception (Exception, throw, try)
+import Bluefin.Exception (Exception, catch, throw)
 import Bluefin.IO (IOE, effIO)
 import Control.Applicative ((<|>))
 import Data.ByteString (putStr)
@@ -256,12 +256,12 @@ runEffOrExitFailure ::
   IO b
 runEffOrExitFailure f = do
   runEff $ \io -> do
-    r <- try (f io)
-    case r of
-      Left l -> effIO io $ do
-        Prelude.putStrLn l
-        exitWith (ExitFailure 1)
-      Right r_ -> pure r_
+    catch
+      (f io)
+      ( \l -> effIO io $ do
+          Prelude.putStrLn l
+          exitWith (ExitFailure 1)
+      )
 
 main :: IO ()
 main = runEffOrExitFailure $ \io ex ->
