@@ -270,6 +270,16 @@ branchStatus io ex gitDir =
 
       pure (Right (beforeStr, afterStr))
 
+renderStatus :: Either Colored (Maybe Before, Maybe Colored) -> Colored
+renderStatus = \case
+  Left branchName -> headSymbol <> fromString "=" <> branchName
+  Right x -> case x of
+    (Nothing, Nothing) -> fromString ""
+    (Just (At b), _) -> headSymbol <> fromString "@" <> b
+    (Just (Before b), Nothing) -> b <> fromString "-" <> headSymbol
+    (Nothing, Just a) -> headSymbol <> fromString "-" <> a
+    (Just (Before b), Just a) -> b <> fromString "-" <> headSymbol <> fromString "-" <> a
+
 runEffOrExitFailure ::
   ( forall e1 e2 e3 es.
     IOE e1 ->
@@ -309,14 +319,6 @@ main = runEffOrExitFailure $ \io success ex -> do
 
   toDisplay <- do
     cob <- branchStatus io ex gitDir
-
-    pure $ case cob of
-      Left branchName -> headSymbol <> fromString "=" <> branchName
-      Right x -> case x of
-        (Nothing, Nothing) -> fromString ""
-        (Just (At b), _) -> headSymbol <> fromString "@" <> b
-        (Just (Before b), Nothing) -> b <> fromString "-" <> headSymbol
-        (Nothing, Just a) -> headSymbol <> fromString "-" <> a
-        (Just (Before b), Just a) -> b <> fromString "-" <> headSymbol <> fromString "-" <> a
+    pure $ renderStatus cob
 
   effIO io (putColoredVT100 toDisplay)
