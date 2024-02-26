@@ -175,9 +175,9 @@ before io ex gitDir = do
       let coloredShortRef = case mRefType of
             Nothing -> Plain shortRef
             Just refType_ -> colorRef refType_ (Plain shortRef)
-       in (pure . Just) $ case distance of
-            0 -> At coloredShortRef
-            _ -> Before (coloredShortRef <> fromString "-" <> Plain (tshow distance))
+      (pure . Just) $ case distance of
+        0 -> At coloredShortRef
+        _ -> Before (coloredShortRef <> fromString "-" <> Plain (tshow distance))
     -- I don't know a way of distinguishing between the various error
     -- conditions
     ExitFailure _ -> pure Nothing
