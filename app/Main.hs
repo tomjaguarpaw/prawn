@@ -162,7 +162,9 @@ parseGitDescribe stdout =
       pure (mRefType, shortRef, distance)
     _ -> Left "Expected three components separated by dashes"
 
-before :: GitDir -> ExceptT String IO (Maybe Before)
+before ::
+  GitDir ->
+  ExceptT String IO (Maybe Before)
 before gitDir = runExceptTIO $ \io ex -> do
   (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--long"])
 
