@@ -3,6 +3,8 @@
 
 module Main where
 
+import Bluefin.Exception (try, throw)
+import Bluefin.Eff (runPureEff)
 import Control.Applicative ((<|>))
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
@@ -174,16 +176,16 @@ before gitDir = do
 parseGitDescribeContains ::
   Text ->
   Either String (Maybe RefType, Text, Int)
-parseGitDescribeContains stdout = do
+parseGitDescribeContains stdout = runPureEff $ try $ \ex -> do
   (ref, distance) <- case Prelude.reverse (split (== '~') stdout) of
     [ref] -> pure (ref, 0)
     distanceT : refParts@(_ : _) -> do
       distance <- case treadMaybe distanceT :: Maybe Int of
-        Nothing -> Left ("Couldn't read distance: " <> unpack distanceT)
+        Nothing -> throw ex ("Couldn't read distance: " <> unpack distanceT)
         Just d -> pure d
 
       pure (intercalate (fromString "~") (reverse refParts), distance)
-    [] -> Left "Expected non-empty output"
+    [] -> throw ex "Expected non-empty output"
 
   let (mRefType, shortRef) = case refType ref of
         Nothing -> (Nothing, ref)
