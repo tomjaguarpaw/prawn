@@ -252,7 +252,11 @@ checkedOutBranch io ex gitDir = do
     ExitFailure _ -> pure Nothing
 
 runEffOrExitFailure ::
-  (forall e1 e2 es. IOE e1 -> Exception String e2 -> Eff (e2 :& e1 :& es) b) ->
+  ( forall e1 e2 es.
+    IOE e1 ->
+    Exception String e2 ->
+    Eff (e2 :& e1 :& es) b
+  ) ->
   IO b
 runEffOrExitFailure f = runEff $ \io -> do
   catch
