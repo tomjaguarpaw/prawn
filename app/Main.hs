@@ -163,9 +163,12 @@ parseGitDescribe stdout =
     _ -> Left "Expected three components separated by dashes"
 
 before ::
+  (e1 :> es, e2 :> es) =>
+  IOE e1 ->
+  Exception String e2 ->
   GitDir ->
-  ExceptT String IO (Maybe Before)
-before gitDir = runExceptTIO $ \io ex -> do
+  Eff es (Maybe Before)
+before io ex gitDir = do
   (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--long"])
 
   case exitCode of
@@ -263,7 +266,7 @@ main = do
               checkedOutBranch gitDir >>= \case
                 Just branchName -> pure $ branch <> fromString "=" <> branchName
                 Nothing -> do
-                  beforeStr <- before gitDir
+                  beforeStr <- runExceptTIO (\io ex -> before io ex gitDir)
                   afterStr <- runExceptTIO (\io ex -> after io ex gitDir)
 
                   pure $ case (beforeStr, afterStr) of
