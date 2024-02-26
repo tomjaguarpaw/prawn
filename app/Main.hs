@@ -128,9 +128,12 @@ colorRef = Colored . \case Head -> Green; Remote -> Red; Tag -> Yellow
 newtype GitDir = UnsafeGitDir {unGitDir :: FilePath}
 
 getGitDir ::
+  (e1 :> es, e2 :> es) =>
+  IOE e1 ->
+  Exception String e2 ->
   FilePath ->
-  ExceptT String IO (Maybe GitDir)
-getGitDir filepath = runExceptTIO $ \io ex -> do
+  Eff es (Maybe GitDir)
+getGitDir io ex filepath = do
   (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", filepath, "rev-parse", "--absolute-git-dir"])
 
   pure $ case exitCode of
@@ -262,7 +265,7 @@ main = do
       [] -> throwE "Need exactly one argument"
       (_ : _ : _) -> throwE "Need exactly one argument"
       [path] ->
-        getGitDir path >>= \case
+        runExceptTIO (\io ex -> getGitDir io ex path) >>= \case
           Nothing -> pure ()
           Just gitDir -> runExceptTIO $ \io ex -> do
             let branch = Colored Cyan (Plain (fromString "HEAD"))
