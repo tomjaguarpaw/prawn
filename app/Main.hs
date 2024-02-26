@@ -269,29 +269,28 @@ runEffOrExitFailure f = do
     Right r_ -> pure r_
 
 main :: IO ()
-main = do
-  runEffOrExitFailure $ \io ex ->
-    effIO io System.Environment.getArgs >>= \case
-      [] -> throw ex "Need exactly one argument"
-      (_ : _ : _) -> throw ex "Need exactly one argument"
-      [path] ->
-        getGitDir io ex path >>= \case
-          Nothing -> pure ()
-          Just gitDir -> do
-            let branch = Colored Cyan (Plain (fromString "HEAD"))
+main = runEffOrExitFailure $ \io ex ->
+  effIO io System.Environment.getArgs >>= \case
+    [] -> throw ex "Need exactly one argument"
+    (_ : _ : _) -> throw ex "Need exactly one argument"
+    [path] ->
+      getGitDir io ex path >>= \case
+        Nothing -> pure ()
+        Just gitDir -> do
+          let branch = Colored Cyan (Plain (fromString "HEAD"))
 
-            toDisplay <- do
-              checkedOutBranch io ex gitDir >>= \case
-                Just branchName -> pure $ branch <> fromString "=" <> branchName
-                Nothing -> do
-                  beforeStr <- before io ex gitDir
-                  afterStr <- after io ex gitDir
+          toDisplay <- do
+            checkedOutBranch io ex gitDir >>= \case
+              Just branchName -> pure $ branch <> fromString "=" <> branchName
+              Nothing -> do
+                beforeStr <- before io ex gitDir
+                afterStr <- after io ex gitDir
 
-                  pure $ case (beforeStr, afterStr) of
-                    (Nothing, Nothing) -> fromString ""
-                    (Just (At b), _) -> branch <> fromString "@" <> b
-                    (Just (Before b), Nothing) -> b <> fromString "-" <> branch
-                    (Nothing, Just a) -> branch <> fromString "-" <> a
-                    (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
+                pure $ case (beforeStr, afterStr) of
+                  (Nothing, Nothing) -> fromString ""
+                  (Just (At b), _) -> branch <> fromString "@" <> b
+                  (Just (Before b), Nothing) -> b <> fromString "-" <> branch
+                  (Nothing, Just a) -> branch <> fromString "-" <> a
+                  (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
 
-            effIO io (putColoredVT100 toDisplay)
+          effIO io (putColoredVT100 toDisplay)
