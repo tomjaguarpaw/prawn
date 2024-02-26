@@ -257,9 +257,20 @@ checkedOutBranch io ex gitDir = do
       Just branchName -> pure (Just (Colored Green (Plain branchName)))
     ExitFailure _ -> pure Nothing
 
+runEffOrExitFailure ::
+  (forall e1 e2 es. IOE e1 -> Exception String e2 -> Eff (e2 :& e1 :& es) b) ->
+  IO b
+runEffOrExitFailure f = do
+  r <- runExceptT $ runExceptTIO f
+  case r of
+    Left l -> do
+      Prelude.putStrLn l
+      exitWith (ExitFailure 1)
+    Right r_ -> pure r_
+
 main :: IO ()
 main = do
-  r <- runExceptT $ runExceptTIO $ \io ex -> do
+  runEffOrExitFailure $ \io ex ->
     effIO io System.Environment.getArgs >>= \case
       [] -> throw ex "Need exactly one argument"
       (_ : _ : _) -> throw ex "Need exactly one argument"
@@ -284,9 +295,3 @@ main = do
                     (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
 
             effIO io (putColoredVT100 toDisplay)
-
-  case r of
-    Left l -> do
-      Prelude.putStrLn l
-      exitWith (ExitFailure 1)
-    Right r_ -> pure r_
