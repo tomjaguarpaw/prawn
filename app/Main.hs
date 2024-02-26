@@ -8,7 +8,7 @@ module Main where
 import System.Process.Typed (ProcessConfig, readProcess, setStdin, nullStream, proc)
 import System.Environment (getArgs)
 import System.Exit (ExitCode(ExitSuccess, ExitFailure))
-import Data.ByteString (putStr, ByteString)
+import Data.ByteString (putStr)
 import Data.ByteString.Lazy (toStrict)
 import Control.Applicative ((<|>))
 import Data.String (fromString, IsString)
