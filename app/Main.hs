@@ -237,6 +237,9 @@ after io ex gitDir = do
     -- conditions
     ExitFailure _ -> pure Nothing
 
+headSymbol :: Colored
+headSymbol = Colored Cyan (Plain (fromString "HEAD"))
+
 checkedOutBranch ::
   (e1 :> es, e2 :> es) =>
   IOE e1 ->
@@ -284,8 +287,6 @@ main = runEffOrExitFailure $ \io success ex -> do
     getGitDir io ex path >>= \case
       Nothing -> jumpTo success
       Just gitDir -> pure gitDir
-
-  let headSymbol = Colored Cyan (Plain (fromString "HEAD"))
 
   toDisplay <-
     checkedOutBranch io ex gitDir >>= \case
