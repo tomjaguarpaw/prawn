@@ -254,14 +254,13 @@ checkedOutBranch io ex gitDir = do
 runEffOrExitFailure ::
   (forall e1 e2 es. IOE e1 -> Exception String e2 -> Eff (e2 :& e1 :& es) b) ->
   IO b
-runEffOrExitFailure f =
-  runEff $ \io -> do
-    catch
-      (f io)
-      ( \l -> effIO io $ do
-          Prelude.putStrLn l
-          exitWith (ExitFailure 1)
-      )
+runEffOrExitFailure f = runEff $ \io -> do
+  catch
+    (f io)
+    ( \l -> effIO io $ do
+        Prelude.putStrLn l
+        exitWith (ExitFailure 1)
+    )
 
 main :: IO ()
 main = runEffOrExitFailure $ \io ex ->
