@@ -211,8 +211,13 @@ parseGitDescribeContains ex stdout = do
 
   pure (mRefType, shortRef, distance)
 
-after :: GitDir -> ExceptT String IO (Maybe Colored)
-after gitDir = runExceptTIO $ \io ex -> do
+after ::
+  (e1 :> es, e2 :> es) =>
+  IOE e1 ->
+  Exception String e2 ->
+  GitDir ->
+  Eff es (Maybe Colored)
+after io ex gitDir = do
   (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--contains"])
 
   case exitCode of
@@ -257,7 +262,7 @@ main = do
                 Just branchName -> pure $ branch <> fromString "=" <> branchName
                 Nothing -> do
                   beforeStr <- before gitDir
-                  afterStr <- after gitDir
+                  afterStr <- runExceptTIO (\io ex -> after io ex gitDir)
 
                   pure $ case (beforeStr, afterStr) of
                     (Nothing, Nothing) -> fromString ""
