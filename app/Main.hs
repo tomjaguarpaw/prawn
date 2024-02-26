@@ -147,13 +147,15 @@ getGitDir filepath = do
 
 -- We ignore the commit hash.  We can get that in other ways.
 parseGitDescribe ::
+  (e1 :> es) =>
+  Exception String e1 ->
   Text ->
-  Either String (Maybe RefType, Text, Int)
-parseGitDescribe stdout =
+  Eff es (Maybe RefType, Text, Int)
+parseGitDescribe ex stdout =
   case Prelude.reverse (split (== '-') stdout) of
     _rev : distanceT : refParts -> do
       distance <- case treadMaybe distanceT :: Maybe Int of
-        Nothing -> Left ("Couldn't read distance: " <> unpack distanceT)
+        Nothing -> throw ex ("Couldn't read distance: " <> unpack distanceT)
         Just d -> pure d
 
       let ref = intercalate (fromString "-") (reverse refParts)
@@ -162,7 +164,7 @@ parseGitDescribe stdout =
             Just (refType_, shortRef_) -> (Just refType_, shortRef_)
 
       pure (mRefType, shortRef, distance)
-    _ -> Left "Expected three components separated by dashes"
+    _ -> throw ex "Expected three components separated by dashes"
 
 before ::
   (e1 :> es, e2 :> es) =>
@@ -174,15 +176,14 @@ before io ex gitDir = do
   (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--long"])
 
   case exitCode of
-    ExitSuccess -> case parseGitDescribe stdout of
-      Left e -> throw ex e
-      Right (mRefType, shortRef, distance) ->
-        let coloredShortRef = case mRefType of
-              Nothing -> Plain shortRef
-              Just refType_ -> colorRef refType_ (Plain shortRef)
-         in (pure . Just) $ case distance of
-              0 -> At coloredShortRef
-              _ -> Before (coloredShortRef <> fromString "-" <> Plain (tshow distance))
+    ExitSuccess -> do
+      (mRefType, shortRef, distance) <- parseGitDescribe ex stdout
+      let coloredShortRef = case mRefType of
+            Nothing -> Plain shortRef
+            Just refType_ -> colorRef refType_ (Plain shortRef)
+       in (pure . Just) $ case distance of
+            0 -> At coloredShortRef
+            _ -> Before (coloredShortRef <> fromString "-" <> Plain (tshow distance))
     -- I don't know a way of distinguishing between the various error
     -- conditions
     ExitFailure _ -> pure Nothing
