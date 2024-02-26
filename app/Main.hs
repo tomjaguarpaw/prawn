@@ -9,7 +9,6 @@ import Bluefin.Eff (Eff, runEff, (:&), (:>))
 import Bluefin.Exception (Exception, throw, try)
 import Bluefin.IO (IOE, effIO)
 import Control.Applicative ((<|>))
-import Control.Monad.Trans.Except (ExceptT (ExceptT), runExceptT)
 import Data.ByteString (putStr)
 import Data.ByteString.Lazy (toStrict)
 import Data.String (IsString, fromString)
@@ -256,7 +255,7 @@ runEffOrExitFailure ::
   (forall e1 e2 es. IOE e1 -> Exception String e2 -> Eff (e2 :& e1 :& es) b) ->
   IO b
 runEffOrExitFailure f = do
-  r <- runExceptT $ ExceptT (runEff $ \io -> try (f io))
+  r <- runEff $ \io -> try (f io)
   case r of
     Left l -> do
       Prelude.putStrLn l
