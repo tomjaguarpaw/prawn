@@ -277,7 +277,7 @@ main = runEffOrExitFailure $ \io ex -> do
     Just gitDir -> do
       let branch = Colored Cyan (Plain (fromString "HEAD"))
 
-      toDisplay <- do
+      toDisplay <-
         checkedOutBranch io ex gitDir >>= \case
           Just branchName -> pure $ branch <> fromString "=" <> branchName
           Nothing -> do
