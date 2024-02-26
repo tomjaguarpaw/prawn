@@ -16,7 +16,7 @@ import Data.String (IsString, fromString)
 import Data.Text (Text, intercalate, split, strip, stripPrefix, unpack)
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
 import System.Environment (getArgs)
-import System.Exit (ExitCode (ExitFailure, ExitSuccess))
+import System.Exit (ExitCode (ExitFailure, ExitSuccess), exitWith)
 import System.Process.Typed (ProcessConfig, nullStream, proc, readProcess, setStdin)
 import Text.Read (readMaybe)
 
@@ -286,5 +286,7 @@ main = do
             effIO io (putColoredVT100 toDisplay)
 
   case r of
-    Left l -> Prelude.putStrLn l
+    Left l -> do
+      Prelude.putStrLn l
+      exitWith (ExitFailure 1)
     Right r_ -> pure r_
