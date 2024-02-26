@@ -82,10 +82,13 @@ runExceptTIO ::
   ExceptT e IO r
 runExceptTIO f = ExceptT (runEff $ \io -> try (f io))
 
-run ::
+runIOEff ::
+  (e :> es, ex :> es) =>
+  IOE e ->
+  Exception String ex ->
   ProcessConfig () () () ->
-  ExceptT String IO (ExitCode, Text)
-run p = runExceptTIO $ \io ex -> do
+  Eff es (ExitCode, Text)
+runIOEff io ex p = do
   (exitCode, eStdout, _stderr) <- effIO io (readProcess (setStdin nullStream p))
 
   stdout <- case (fmap strip . decodeUtf8' . toStrict) eStdout of
@@ -93,6 +96,11 @@ run p = runExceptTIO $ \io ex -> do
     Right stdout -> pure stdout
 
   pure (exitCode, stdout)
+
+run ::
+  ProcessConfig () () () ->
+  ExceptT String IO (ExitCode, Text)
+run p = runExceptTIO $ \io ex -> runIOEff io ex p
 
 data Before = At Colored | Before Colored
 
