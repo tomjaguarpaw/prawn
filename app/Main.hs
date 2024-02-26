@@ -96,9 +96,9 @@ data Before = At Colored | Before Colored
 data Color = Green | Red | Yellow | Cyan
 
 data Colored
-  = Plain Text
-  | Colored Color Colored
-  | Join Colored Colored
+  = Plain !Text
+  | Colored !Color !Colored
+  | Join !Colored !Colored
 
 instance IsString Colored where
   fromString = Plain . fromString
