@@ -255,12 +255,13 @@ runEffOrExitFailure ::
   (forall e1 e2 es. IOE e1 -> Exception String e2 -> Eff (e2 :& e1 :& es) b) ->
   IO b
 runEffOrExitFailure f = do
-  r <- runEff $ \io -> try (f io)
-  case r of
-    Left l -> do
-      Prelude.putStrLn l
-      exitWith (ExitFailure 1)
-    Right r_ -> pure r_
+  runEff $ \io -> do
+    r <- try (f io)
+    case r of
+      Left l -> effIO io $ do
+        Prelude.putStrLn l
+        exitWith (ExitFailure 1)
+      Right r_ -> pure r_
 
 main :: IO ()
 main = runEffOrExitFailure $ \io ex ->
