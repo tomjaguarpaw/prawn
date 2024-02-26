@@ -163,12 +163,12 @@ parseGitDescribe stdout =
     _ -> Left "Expected three components separated by dashes"
 
 before :: GitDir -> ExceptT String IO (Maybe Before)
-before gitDir = do
-  (exitCode, stdout) <- run (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--long"])
+before gitDir = runExceptTIO $ \io ex -> do
+  (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--long"])
 
   case exitCode of
     ExitSuccess -> case parseGitDescribe stdout of
-      Left e -> throwE e
+      Left e -> throw ex e
       Right (mRefType, shortRef, distance) ->
         let coloredShortRef = case mRefType of
               Nothing -> Plain shortRef
