@@ -260,18 +260,20 @@ runEffOrExitFailure ::
     IOE e1 ->
     Jump e2 ->
     Exception String e3 ->
-    Eff (e3 :& e2 :& e1 :& es) ()
+    Eff (e2 :& e3 :& e1 :& es) ()
   ) ->
   IO r
 runEffOrExitFailure f = runEff $ \io -> do
-  withJump $ \success -> do
-    catch
-      (f io success)
-      ( \l -> effIO io $ do
-          Prelude.putStrLn l
-          exitWith (ExitFailure 1)
-      )
-  effIO io (exitWith ExitSuccess)
+  catch
+    ( \ex -> do
+        withJump $ \success ->
+          f io success ex
+        effIO io (exitWith ExitSuccess)
+    )
+    ( \l -> effIO io $ do
+        Prelude.putStrLn l
+        exitWith (ExitFailure 1)
+    )
 
 getArg :: (e :> es, ex :> es) => IOE e -> Exception String ex -> Eff es String
 getArg io ex =
