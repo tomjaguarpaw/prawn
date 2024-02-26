@@ -1,10 +1,11 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module Main where
 
-import Bluefin.Exception (try, throw)
-import Bluefin.Eff (runPureEff)
+import Bluefin.Eff (Eff, runPureEff, (:>))
+import Bluefin.Exception (Exception, throw, try)
 import Control.Applicative ((<|>))
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
@@ -174,9 +175,11 @@ before gitDir = do
 -- master~1
 
 parseGitDescribeContains ::
+  (e :> es) =>
+  Exception String e ->
   Text ->
-  Either String (Maybe RefType, Text, Int)
-parseGitDescribeContains stdout = runPureEff $ try $ \ex -> do
+  Eff es (Maybe RefType, Text, Int)
+parseGitDescribeContains ex stdout = do
   (ref, distance) <- case Prelude.reverse (split (== '~') stdout) of
     [ref] -> pure (ref, 0)
     distanceT : refParts@(_ : _) -> do
@@ -198,7 +201,7 @@ after gitDir = do
   (exitCode, stdout) <- run (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--contains"])
 
   case exitCode of
-    ExitSuccess -> case parseGitDescribeContains stdout of
+    ExitSuccess -> case runPureEff $ try $ \ex -> parseGitDescribeContains ex stdout of
       Left e -> throwE e
       Right (mRefType, shortRef, distance) ->
         let coloredShortRef = case mRefType of
