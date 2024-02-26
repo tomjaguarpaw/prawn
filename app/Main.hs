@@ -212,12 +212,12 @@ parseGitDescribeContains ex stdout = do
   pure (mRefType, shortRef, distance)
 
 after :: GitDir -> ExceptT String IO (Maybe Colored)
-after gitDir = do
-  (exitCode, stdout) <- run (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--contains"])
+after gitDir = runExceptTIO $ \io ex -> do
+  (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--contains"])
 
   case exitCode of
     ExitSuccess -> case runPureEff $ try $ \ex -> parseGitDescribeContains ex stdout of
-      Left e -> throwE e
+      Left e -> throw ex e
       Right (mRefType, shortRef, distance) ->
         let coloredShortRef = case mRefType of
               -- "git describe --all --contains" does not prefix heads
