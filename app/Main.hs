@@ -91,7 +91,7 @@ runIOEff io ex p = do
 
   pure (exitCode, stdout)
 
-data Before = At Colored | Before Colored
+data Before = At !Colored | Before !Colored
 
 data Color = Green | Red | Yellow | Cyan
 
