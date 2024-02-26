@@ -285,20 +285,20 @@ main = runEffOrExitFailure $ \io success ex -> do
       Nothing -> jumpTo success
       Just gitDir -> pure gitDir
 
-  let branch = Colored Cyan (Plain (fromString "HEAD"))
+  let headSymbol = Colored Cyan (Plain (fromString "HEAD"))
 
   toDisplay <-
     checkedOutBranch io ex gitDir >>= \case
-      Just branchName -> pure $ branch <> fromString "=" <> branchName
+      Just branchName -> pure $ headSymbol <> fromString "=" <> branchName
       Nothing -> do
         beforeStr <- before io ex gitDir
         afterStr <- after io ex gitDir
 
         pure $ case (beforeStr, afterStr) of
           (Nothing, Nothing) -> fromString ""
-          (Just (At b), _) -> branch <> fromString "@" <> b
-          (Just (Before b), Nothing) -> b <> fromString "-" <> branch
-          (Nothing, Just a) -> branch <> fromString "-" <> a
-          (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
+          (Just (At b), _) -> headSymbol <> fromString "@" <> b
+          (Just (Before b), Nothing) -> b <> fromString "-" <> headSymbol
+          (Nothing, Just a) -> headSymbol <> fromString "-" <> a
+          (Just (Before b), Just a) -> b <> fromString "-" <> headSymbol <> fromString "-" <> a
 
   effIO io (putColoredVT100 toDisplay)
