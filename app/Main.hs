@@ -280,9 +280,11 @@ getArg io ex =
 main :: IO ()
 main = runEffOrExitFailure $ \io success ex -> do
   path <- getArg io ex
-  getGitDir io ex path >>= \case
+  gitDir <- getGitDir io ex path >>= \case
     Nothing -> jumpTo success
-    Just gitDir -> do
+    Just gitDir -> pure gitDir
+
+  do
       let branch = Colored Cyan (Plain (fromString "HEAD"))
 
       toDisplay <-
