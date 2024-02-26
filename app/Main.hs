@@ -255,6 +255,21 @@ checkedOutBranch io ex gitDir = do
       Just branchName -> pure (Just (Colored Green (Plain branchName)))
     ExitFailure _ -> pure Nothing
 
+branchStatus ::
+  (e1 :> es, e2 :> es) =>
+  IOE e1 ->
+  Exception String e2 ->
+  GitDir ->
+  Eff es (Either Colored (Maybe Before, Maybe Colored))
+branchStatus io ex gitDir =
+  checkedOutBranch io ex gitDir >>= \case
+    Just branchName -> pure (Left branchName)
+    Nothing -> do
+      beforeStr <- before io ex gitDir
+      afterStr <- after io ex gitDir
+
+      pure (Right (beforeStr, afterStr))
+
 runEffOrExitFailure ::
   ( forall e1 e2 e3 es.
     IOE e1 ->
@@ -293,14 +308,7 @@ main = runEffOrExitFailure $ \io success ex -> do
       Just gitDir -> pure gitDir
 
   toDisplay <- do
-    cob <-
-      checkedOutBranch io ex gitDir >>= \case
-        Just branchName -> pure (Left branchName)
-        Nothing -> do
-          beforeStr <- before io ex gitDir
-          afterStr <- after io ex gitDir
-
-          pure (Right (beforeStr, afterStr))
+    cob <- branchStatus io ex gitDir
 
     pure $ case cob of
       Left branchName -> headSymbol <> fromString "=" <> branchName
