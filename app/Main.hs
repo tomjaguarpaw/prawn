@@ -9,8 +9,7 @@ import Bluefin.Eff (Eff, runEff, (:&), (:>))
 import Bluefin.Exception (Exception, throw, try)
 import Bluefin.IO (IOE, effIO)
 import Control.Applicative ((<|>))
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except (ExceptT (ExceptT), runExceptT, throwE)
+import Control.Monad.Trans.Except (ExceptT (ExceptT), runExceptT)
 import Data.ByteString (putStr)
 import Data.ByteString.Lazy (toStrict)
 import Data.String (IsString, fromString)
@@ -260,14 +259,14 @@ checkedOutBranch io ex gitDir = do
 
 main :: IO ()
 main = do
-  r <- runExceptT $ do
-    lift System.Environment.getArgs >>= \case
-      [] -> throwE "Need exactly one argument"
-      (_ : _ : _) -> throwE "Need exactly one argument"
+  r <- runExceptT $ runExceptTIO $ \io ex -> do
+    effIO io System.Environment.getArgs >>= \case
+      [] -> throw ex "Need exactly one argument"
+      (_ : _ : _) -> throw ex "Need exactly one argument"
       [path] ->
-        runExceptTIO (\io ex -> getGitDir io ex path) >>= \case
+        getGitDir io ex path >>= \case
           Nothing -> pure ()
-          Just gitDir -> runExceptTIO $ \io ex -> do
+          Just gitDir -> do
             let branch = Colored Cyan (Plain (fromString "HEAD"))
 
             toDisplay <- do
