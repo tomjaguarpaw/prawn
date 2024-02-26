@@ -255,9 +255,9 @@ runEffOrExitFailure ::
   ( forall e1 e2 es.
     IOE e1 ->
     Exception String e2 ->
-    Eff (e2 :& e1 :& es) b
+    Eff (e2 :& e1 :& es) ()
   ) ->
-  IO b
+  IO r
 runEffOrExitFailure f = runEff $ \io -> do
   catch
     (f io)
