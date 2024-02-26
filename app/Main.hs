@@ -319,8 +319,6 @@ main = runEffOrExitFailure $ \io success ex -> do
       Nothing -> jumpTo success
       Just gitDir -> pure gitDir
 
-  toDisplay <- do
-    cob <- branchStatus io ex gitDir
-    pure $ renderStatus cob
+  status <- branchStatus io ex gitDir
 
-  effIO io (putColoredVT100 toDisplay)
+  effIO io (putColoredVT100 (renderStatus status))
