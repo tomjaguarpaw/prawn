@@ -255,12 +255,14 @@ checkedOutBranch io ex gitDir = do
       Just branchName -> pure (Just (Colored Green (Plain branchName)))
     ExitFailure _ -> pure Nothing
 
+type Status = Either Colored (Maybe Before, Maybe Colored)
+
 branchStatus ::
   (e1 :> es, e2 :> es) =>
   IOE e1 ->
   Exception String e2 ->
   GitDir ->
-  Eff es (Either Colored (Maybe Before, Maybe Colored))
+  Eff es Status
 branchStatus io ex gitDir =
   checkedOutBranch io ex gitDir >>= \case
     Just branchName -> pure (Left branchName)
@@ -270,7 +272,7 @@ branchStatus io ex gitDir =
 
       pure (Right (beforeStr, afterStr))
 
-renderStatus :: Either Colored (Maybe Before, Maybe Colored) -> Colored
+renderStatus :: Status -> Colored
 renderStatus = \case
   Left branchName -> headSymbol <> fromString "=" <> branchName
   Right x -> case x of
