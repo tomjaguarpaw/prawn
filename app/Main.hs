@@ -5,7 +5,7 @@
 
 module Main where
 
-import Bluefin.Eff (Eff, runEff, runPureEff, (:&), (:>))
+import Bluefin.Eff (Eff, runEff, (:&), (:>))
 import Bluefin.Exception (Exception, throw, try)
 import Bluefin.IO (IOE, effIO)
 import Control.Applicative ((<|>))
@@ -216,17 +216,16 @@ after gitDir = runExceptTIO $ \io ex -> do
   (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--contains"])
 
   case exitCode of
-    ExitSuccess -> case runPureEff $ try $ \ex -> parseGitDescribeContains ex stdout of
-      Left e -> throw ex e
-      Right (mRefType, shortRef, distance) ->
-        let coloredShortRef = case mRefType of
-              -- "git describe --all --contains" does not prefix heads
-              -- with "head/".  Therefore if parsing returns an
-              -- unknown ref type we assume it was a head and color it
-              -- accordingly.
-              Nothing -> colorRef Head (Plain shortRef)
-              Just refType_ -> colorRef refType_ (Plain shortRef)
-         in pure (Just (Plain (tshow distance) <> fromString "-" <> coloredShortRef))
+    ExitSuccess -> do
+      (mRefType, shortRef, distance) <- parseGitDescribeContains ex stdout
+      let coloredShortRef = case mRefType of
+            -- "git describe --all --contains" does not prefix heads
+            -- with "head/".  Therefore if parsing returns an
+            -- unknown ref type we assume it was a head and color it
+            -- accordingly.
+            Nothing -> colorRef Head (Plain shortRef)
+            Just refType_ -> colorRef refType_ (Plain shortRef)
+       in pure (Just (Plain (tshow distance) <> fromString "-" <> coloredShortRef))
     -- I don't know a way of distinguishing between the various error
     -- conditions
     ExitFailure _ -> pure Nothing
