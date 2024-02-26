@@ -132,7 +132,9 @@ colorRef = Colored . \case Head -> Green; Remote -> Red; Tag -> Yellow
 
 newtype GitDir = UnsafeGitDir {unGitDir :: FilePath}
 
-getGitDir :: FilePath -> ExceptT String IO (Maybe GitDir)
+getGitDir ::
+  FilePath ->
+  ExceptT String IO (Maybe GitDir)
 getGitDir filepath = do
   (exitCode, stdout) <- run (proc "git" ["-C", filepath, "rev-parse", "--absolute-git-dir"])
 
