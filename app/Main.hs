@@ -262,29 +262,33 @@ runEffOrExitFailure f = runEff $ \io -> do
         exitWith (ExitFailure 1)
     )
 
-main :: IO ()
-main = runEffOrExitFailure $ \io ex ->
+getArg :: (e :> es, ex :> es) => IOE e -> Exception String ex -> Eff es String
+getArg io ex =
   effIO io System.Environment.getArgs >>= \case
     [] -> throw ex "Need exactly one argument"
     (_ : _ : _) -> throw ex "Need exactly one argument"
-    [path] ->
-      getGitDir io ex path >>= \case
-        Nothing -> pure ()
-        Just gitDir -> do
-          let branch = Colored Cyan (Plain (fromString "HEAD"))
+    [one] -> pure one
 
-          toDisplay <- do
-            checkedOutBranch io ex gitDir >>= \case
-              Just branchName -> pure $ branch <> fromString "=" <> branchName
-              Nothing -> do
-                beforeStr <- before io ex gitDir
-                afterStr <- after io ex gitDir
+main :: IO ()
+main = runEffOrExitFailure $ \io ex -> do
+  path <- getArg io ex
+  getGitDir io ex path >>= \case
+    Nothing -> pure ()
+    Just gitDir -> do
+      let branch = Colored Cyan (Plain (fromString "HEAD"))
 
-                pure $ case (beforeStr, afterStr) of
-                  (Nothing, Nothing) -> fromString ""
-                  (Just (At b), _) -> branch <> fromString "@" <> b
-                  (Just (Before b), Nothing) -> b <> fromString "-" <> branch
-                  (Nothing, Just a) -> branch <> fromString "-" <> a
-                  (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
+      toDisplay <- do
+        checkedOutBranch io ex gitDir >>= \case
+          Just branchName -> pure $ branch <> fromString "=" <> branchName
+          Nothing -> do
+            beforeStr <- before io ex gitDir
+            afterStr <- after io ex gitDir
 
-          effIO io (putColoredVT100 toDisplay)
+            pure $ case (beforeStr, afterStr) of
+              (Nothing, Nothing) -> fromString ""
+              (Just (At b), _) -> branch <> fromString "@" <> b
+              (Just (Before b), Nothing) -> b <> fromString "-" <> branch
+              (Nothing, Just a) -> branch <> fromString "-" <> a
+              (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
+
+      effIO io (putColoredVT100 toDisplay)
