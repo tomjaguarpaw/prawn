@@ -97,11 +97,6 @@ runIOEff io ex p = do
 
   pure (exitCode, stdout)
 
-run ::
-  ProcessConfig () () () ->
-  ExceptT String IO (ExitCode, Text)
-run p = runExceptTIO $ \io ex -> runIOEff io ex p
-
 data Before = At Colored | Before Colored
 
 data Color = Green | Red | Yellow | Cyan
@@ -135,8 +130,8 @@ newtype GitDir = UnsafeGitDir {unGitDir :: FilePath}
 getGitDir ::
   FilePath ->
   ExceptT String IO (Maybe GitDir)
-getGitDir filepath = do
-  (exitCode, stdout) <- run (proc "git" ["-C", filepath, "rev-parse", "--absolute-git-dir"])
+getGitDir filepath = runExceptTIO $ \io ex -> do
+  (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", filepath, "rev-parse", "--absolute-git-dir"])
 
   pure $ case exitCode of
     ExitFailure _ -> Nothing
