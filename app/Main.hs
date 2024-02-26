@@ -244,9 +244,12 @@ after io ex gitDir = do
     ExitFailure _ -> pure Nothing
 
 checkedOutBranch ::
+  (e1 :> es, e2 :> es) =>
+  IOE e1 ->
+  Exception String e2 ->
   GitDir ->
-  ExceptT String IO (Maybe Colored)
-checkedOutBranch gitDir = runExceptTIO $ \io ex -> do
+  Eff es (Maybe Colored)
+checkedOutBranch io ex gitDir = do
   (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", unGitDir gitDir, "symbolic-ref", "HEAD"])
 
   case exitCode of
@@ -268,7 +271,7 @@ main = do
             let branch = Colored Cyan (Plain (fromString "HEAD"))
 
             toDisplay <-
-              checkedOutBranch gitDir >>= \case
+              runExceptTIO (\io ex -> checkedOutBranch io ex gitDir) >>= \case
                 Just branchName -> pure $ branch <> fromString "=" <> branchName
                 Nothing -> do
                   beforeStr <- runExceptTIO (\io ex -> before io ex gitDir)
