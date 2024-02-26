@@ -76,13 +76,13 @@ tshow = fromString . show
 treadMaybe :: (Read a) => Text -> Maybe a
 treadMaybe = readMaybe . unpack
 
-runIOEff ::
+run ::
   (e :> es, ex :> es) =>
   IOE e ->
   Exception String ex ->
   ProcessConfig () () () ->
   Eff es (ExitCode, Text)
-runIOEff io ex p = do
+run io ex p = do
   (exitCode, eStdout, _stderr) <- effIO io (readProcess (setStdin nullStream p))
 
   stdout <- case (fmap strip . decodeUtf8' . toStrict) eStdout of
@@ -128,7 +128,7 @@ getGitDir ::
   FilePath ->
   Eff es (Maybe GitDir)
 getGitDir io ex filepath = do
-  (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", filepath, "rev-parse", "--absolute-git-dir"])
+  (exitCode, stdout) <- run io ex (proc "git" ["-C", filepath, "rev-parse", "--absolute-git-dir"])
 
   pure $ case exitCode of
     ExitFailure _ -> Nothing
@@ -167,7 +167,7 @@ before ::
   GitDir ->
   Eff es (Maybe Before)
 before io ex gitDir = do
-  (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--long"])
+  (exitCode, stdout) <- run io ex (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--long"])
 
   case exitCode of
     ExitSuccess -> do
@@ -220,7 +220,7 @@ after ::
   GitDir ->
   Eff es (Maybe Colored)
 after io ex gitDir = do
-  (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--contains"])
+  (exitCode, stdout) <- run io ex (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--contains"])
 
   case exitCode of
     ExitSuccess -> do
@@ -247,7 +247,7 @@ checkedOutBranch ::
   GitDir ->
   Eff es (Maybe Colored)
 checkedOutBranch io ex gitDir = do
-  (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", unGitDir gitDir, "symbolic-ref", "HEAD"])
+  (exitCode, stdout) <- run io ex (proc "git" ["-C", unGitDir gitDir, "symbolic-ref", "HEAD"])
 
   case exitCode of
     ExitSuccess -> case stripPrefix (fromString "refs/heads/") stdout of
