@@ -171,7 +171,9 @@ before gitDir = do
 -- $ git describe --all --contains
 -- master~1
 
-parseGitDescribeContains :: Text -> Either String (Maybe RefType, Text, Int)
+parseGitDescribeContains ::
+  Text ->
+  Either String (Maybe RefType, Text, Int)
 parseGitDescribeContains stdout = do
   (ref, distance) <- case Prelude.reverse (split (== '~') stdout) of
     [ref] -> pure (ref, 0)
