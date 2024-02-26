@@ -76,11 +76,6 @@ tshow = fromString . show
 treadMaybe :: (Read a) => Text -> Maybe a
 treadMaybe = readMaybe . unpack
 
-runExceptTIO ::
-  (forall es e1 e2. IOE e1 -> Exception e e2 -> Eff (e2 :& e1 :& es) r) ->
-  ExceptT e IO r
-runExceptTIO f = ExceptT (runEff $ \io -> try (f io))
-
 runIOEff ::
   (e :> es, ex :> es) =>
   IOE e ->
@@ -261,7 +256,7 @@ runEffOrExitFailure ::
   (forall e1 e2 es. IOE e1 -> Exception String e2 -> Eff (e2 :& e1 :& es) b) ->
   IO b
 runEffOrExitFailure f = do
-  r <- runExceptT $ runExceptTIO f
+  r <- runExceptT $ ExceptT (runEff $ \io -> try (f io))
   case r of
     Left l -> do
       Prelude.putStrLn l
