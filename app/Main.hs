@@ -8,6 +8,7 @@ module Main where
 import Bluefin.Eff (Eff, runEff, (:&), (:>))
 import Bluefin.Exception (Exception, catch, throw)
 import Bluefin.IO (IOE, effIO)
+import Bluefin.Jump (Jump, jumpTo, withJump)
 import Control.Applicative ((<|>))
 import Data.ByteString (putStr)
 import Data.ByteString.Lazy (toStrict)
@@ -252,19 +253,22 @@ checkedOutBranch io ex gitDir = do
     ExitFailure _ -> pure Nothing
 
 runEffOrExitFailure ::
-  ( forall e1 e2 es.
+  ( forall e1 e2 e3 es.
     IOE e1 ->
-    Exception String e2 ->
-    Eff (e2 :& e1 :& es) ()
+    Jump e2 ->
+    Exception String e3 ->
+    Eff (e3 :& e2 :& e1 :& es) ()
   ) ->
   IO r
 runEffOrExitFailure f = runEff $ \io -> do
-  catch
-    (f io)
-    ( \l -> effIO io $ do
-        Prelude.putStrLn l
-        exitWith (ExitFailure 1)
-    )
+  withJump $ \success -> do
+    catch
+      (f io success)
+      ( \l -> effIO io $ do
+          Prelude.putStrLn l
+          exitWith (ExitFailure 1)
+      )
+  effIO io (exitWith ExitSuccess)
 
 getArg :: (e :> es, ex :> es) => IOE e -> Exception String ex -> Eff es String
 getArg io ex =
@@ -274,10 +278,10 @@ getArg io ex =
     [one] -> pure one
 
 main :: IO ()
-main = runEffOrExitFailure $ \io ex -> do
+main = runEffOrExitFailure $ \io success ex -> do
   path <- getArg io ex
   getGitDir io ex path >>= \case
-    Nothing -> pure ()
+    Nothing -> jumpTo success
     Just gitDir -> do
       let branch = Colored Cyan (Plain (fromString "HEAD"))
 
