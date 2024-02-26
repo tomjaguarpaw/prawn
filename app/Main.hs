@@ -270,12 +270,12 @@ main = do
           Just gitDir -> do
             let branch = Colored Cyan (Plain (fromString "HEAD"))
 
-            toDisplay <-
-              runExceptTIO (\io ex -> checkedOutBranch io ex gitDir) >>= \case
+            toDisplay <- runExceptTIO $ \io ex -> do
+              checkedOutBranch io ex gitDir >>= \case
                 Just branchName -> pure $ branch <> fromString "=" <> branchName
                 Nothing -> do
-                  beforeStr <- runExceptTIO (\io ex -> before io ex gitDir)
-                  afterStr <- runExceptTIO (\io ex -> after io ex gitDir)
+                  beforeStr <- before io ex gitDir
+                  afterStr <- after io ex gitDir
 
                   pure $ case (beforeStr, afterStr) of
                     (Nothing, Nothing) -> fromString ""
