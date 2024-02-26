@@ -91,6 +91,16 @@ run io ex p = do
 
   pure (exitCode, stdout)
 
+runGit ::
+  (e1 :> es, e2 :> es) =>
+  IOE e1 ->
+  Exception String e2 ->
+  GitDir ->
+  [String] ->
+  Eff es (ExitCode, Text)
+runGit io ex gitDir args =
+  run io ex (proc "git" (["-C", unGitDir gitDir] ++ args))
+
 data Before = At !Colored | Before !Colored
 
 data Color = Green | Red | Yellow | Cyan
@@ -167,7 +177,7 @@ before ::
   GitDir ->
   Eff es (Maybe Before)
 before io ex gitDir = do
-  (exitCode, stdout) <- run io ex (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--long"])
+  (exitCode, stdout) <- runGit io ex gitDir ["describe", "--all", "--long"]
 
   case exitCode of
     ExitSuccess -> do
@@ -220,7 +230,7 @@ after ::
   GitDir ->
   Eff es (Maybe Colored)
 after io ex gitDir = do
-  (exitCode, stdout) <- run io ex (proc "git" ["-C", unGitDir gitDir, "describe", "--all", "--contains"])
+  (exitCode, stdout) <- runGit io ex gitDir ["describe", "--all", "--contains"]
 
   case exitCode of
     ExitSuccess -> do
@@ -247,7 +257,7 @@ checkedOutBranch ::
   GitDir ->
   Eff es (Maybe Colored)
 checkedOutBranch io ex gitDir = do
-  (exitCode, stdout) <- run io ex (proc "git" ["-C", unGitDir gitDir, "symbolic-ref", "HEAD"])
+  (exitCode, stdout) <- runGit io ex gitDir ["symbolic-ref", "HEAD"]
 
   case exitCode of
     ExitSuccess -> case stripPrefix (fromString "refs/heads/") stdout of
