@@ -267,10 +267,10 @@ main = do
       [path] ->
         getGitDir path >>= \case
           Nothing -> pure ()
-          Just gitDir -> do
+          Just gitDir -> runExceptTIO $ \io ex -> do
             let branch = Colored Cyan (Plain (fromString "HEAD"))
 
-            toDisplay <- runExceptTIO $ \io ex -> do
+            toDisplay <- do
               checkedOutBranch io ex gitDir >>= \case
                 Just branchName -> pure $ branch <> fromString "=" <> branchName
                 Nothing -> do
@@ -284,7 +284,7 @@ main = do
                     (Nothing, Just a) -> branch <> fromString "-" <> a
                     (Just (Before b), Just a) -> b <> fromString "-" <> branch <> fromString "-" <> a
 
-            lift (putColoredVT100 toDisplay)
+            effIO io (putColoredVT100 toDisplay)
 
   case r of
     Left l -> Prelude.putStrLn l
