@@ -244,12 +244,12 @@ after io ex gitDir = do
     ExitFailure _ -> pure Nothing
 
 checkedOutBranch :: GitDir -> ExceptT String IO (Maybe Colored)
-checkedOutBranch gitDir = do
-  (exitCode, stdout) <- run (proc "git" ["-C", unGitDir gitDir, "symbolic-ref", "HEAD"])
+checkedOutBranch gitDir = runExceptTIO $ \io ex -> do
+  (exitCode, stdout) <- runIOEff io ex (proc "git" ["-C", unGitDir gitDir, "symbolic-ref", "HEAD"])
 
   case exitCode of
     ExitSuccess -> case stripPrefix (fromString "refs/heads/") stdout of
-      Nothing -> throwE ("Expected to start with refs/heads but got: " <> unpack stdout)
+      Nothing -> throw ex ("Expected to start with refs/heads but got: " <> unpack stdout)
       Just branchName -> pure (Just (Colored Green (Plain branchName)))
     ExitFailure _ -> pure Nothing
 
