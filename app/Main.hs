@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module Main where
@@ -104,17 +105,18 @@ data Git e where
     Exception String e2 ->
     Git e
 
+soupGit :: forall es e. (e :> es) => Git e -> Git es
+soupGit (MkGit gitDir (io :: IOE e1) (ex :: Exception String e2)) =
+  inComp @e1 @e @es (inComp @e2 @e @es (MkGit gitDir io ex))
+
 runGit ::
   forall e es.
   (e :> es) =>
   Git e ->
   [String] ->
   Eff es (ExitCode, Text)
-runGit (MkGit gitDir (io :: IOE e1) (ex :: Exception String e2)) args =
-  inComp @e1 @e @es
-    ( inComp @e2 @e @es
-        (run io ex (proc "git" (["-C", unGitDir gitDir] ++ args)))
-    )
+runGit (soupGit @es -> MkGit gitDir io ex) args =
+  run io ex (proc "git" (["-C", unGitDir gitDir] ++ args))
 
 data Before = At !Colored | Before !Colored
 
