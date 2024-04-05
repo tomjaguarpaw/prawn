@@ -336,6 +336,6 @@ withGit path success io ex h = do
 main :: IO ()
 main = runEffOrExitFailure $ \io success ex -> do
   path <- getArg io ex
-  status <- withGit path success io ex (flip branchStatus ex)
+  status <- withGit path success io ex (\git -> flip branchStatus ex git)
 
   effIO io (putColoredVT100 (renderStatus status))
