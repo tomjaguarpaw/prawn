@@ -325,10 +325,10 @@ withGit ::
   Exception String e2 ->
   (Git e1 e2 -> Eff e r) ->
   Eff e r
-withGit path success io ex h = do
+withGit path notGit io ex h = do
   gitDir <-
     getGitDir io ex path >>= \case
-      Nothing -> jumpTo success
+      Nothing -> jumpTo notGit
       Just gitDir -> pure gitDir
 
   h (MkGit gitDir io ex)
