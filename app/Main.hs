@@ -91,14 +91,14 @@ run io ex p = do
 
   pure (exitCode, stdout)
 
+data Git e1 e2 = MkGit GitDir (IOE e1) (Exception String e2)
+
 runGit ::
   (e1 :> es, e2 :> es) =>
-  IOE e1 ->
-  Exception String e2 ->
-  GitDir ->
+  Git e1 e2 ->
   [String] ->
   Eff es (ExitCode, Text)
-runGit io ex gitDir args =
+runGit (MkGit gitDir io ex) args =
   run io ex (proc "git" (["-C", unGitDir gitDir] ++ args))
 
 data Before = At !Colored | Before !Colored
@@ -171,13 +171,12 @@ parseGitDescribe ex stdout =
     _ -> throw ex "Expected three components separated by dashes"
 
 before ::
-  (e1 :> es, e2 :> es) =>
-  IOE e1 ->
-  Exception String e2 ->
-  GitDir ->
+  (e1 :> es, e2 :> es, e3 :> es) =>
+  Git e1 e2 ->
+  Exception String e3 ->
   Eff es (Maybe Before)
-before io ex gitDir = do
-  (exitCode, stdout) <- runGit io ex gitDir ["describe", "--all", "--long"]
+before git ex = do
+  (exitCode, stdout) <- runGit git ["describe", "--all", "--long"]
 
   case exitCode of
     ExitSuccess -> do
@@ -224,13 +223,12 @@ parseGitDescribeContains ex stdout = do
   pure (mRefType, shortRef, distance)
 
 after ::
-  (e1 :> es, e2 :> es) =>
-  IOE e1 ->
-  Exception String e2 ->
-  GitDir ->
+  (e1 :> es, e2 :> es, e3 :> es) =>
+  Git e1 e2 ->
+  Exception String e3 ->
   Eff es (Maybe Colored)
-after io ex gitDir = do
-  (exitCode, stdout) <- runGit io ex gitDir ["describe", "--all", "--contains"]
+after git ex = do
+  (exitCode, stdout) <- runGit git ["describe", "--all", "--contains"]
 
   case exitCode of
     ExitSuccess -> do
@@ -251,13 +249,12 @@ headSymbol :: Colored
 headSymbol = Colored Cyan (Plain (fromString "HEAD"))
 
 checkedOutBranch ::
-  (e1 :> es, e2 :> es) =>
-  IOE e1 ->
-  Exception String e2 ->
-  GitDir ->
+  (e1 :> es, e2 :> es, e3 :> es) =>
+  Git e1 e2 ->
+  Exception String e3 ->
   Eff es (Maybe Colored)
-checkedOutBranch io ex gitDir = do
-  (exitCode, stdout) <- runGit io ex gitDir ["symbolic-ref", "HEAD"]
+checkedOutBranch git ex = do
+  (exitCode, stdout) <- runGit git ["symbolic-ref", "HEAD"]
 
   case exitCode of
     ExitSuccess -> case stripPrefix (fromString "refs/heads/") stdout of
@@ -268,17 +265,16 @@ checkedOutBranch io ex gitDir = do
 type Status = Either Colored (Maybe Before, Maybe Colored)
 
 branchStatus ::
-  (e1 :> es, e2 :> es) =>
-  IOE e1 ->
-  Exception String e2 ->
-  GitDir ->
+  (e1 :> es, e2 :> es, e3 :> es) =>
+  Git e1 e2 ->
+  Exception String e3 ->
   Eff es Status
-branchStatus io ex gitDir =
-  checkedOutBranch io ex gitDir >>= \case
+branchStatus git ex =
+  checkedOutBranch git ex >>= \case
     Just branchName -> pure (Left branchName)
     Nothing -> do
-      beforeStr <- before io ex gitDir
-      afterStr <- after io ex gitDir
+      beforeStr <- before git ex
+      afterStr <- after git ex
 
       pure (Right (beforeStr, afterStr))
 
@@ -329,6 +325,6 @@ main = runEffOrExitFailure $ \io success ex -> do
       Nothing -> jumpTo success
       Just gitDir -> pure gitDir
 
-  status <- branchStatus io ex gitDir
+  status <- branchStatus (MkGit gitDir io ex) ex
 
   effIO io (putColoredVT100 (renderStatus status))
