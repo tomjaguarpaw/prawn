@@ -1,5 +1,8 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wall #-}
 
@@ -8,6 +11,7 @@ module Main where
 import Bluefin.Eff (Eff, runEff, (:&), (:>))
 import Bluefin.Exception (Exception, catch, throw)
 import Bluefin.IO (IOE, effIO)
+import Bluefin.Internal (inComp)
 import Bluefin.Jump (Jump, jumpTo, withJump)
 import Control.Applicative ((<|>))
 import Data.ByteString (putStr)
@@ -19,6 +23,7 @@ import System.Environment (getArgs)
 import System.Exit (ExitCode (ExitFailure, ExitSuccess), exitWith)
 import System.Process.Typed (ProcessConfig, nullStream, proc, readProcess, setStdin)
 import Text.Read (readMaybe)
+import Unsafe.Coerce (unsafeCoerce)
 
 putTextUtf8 :: Text -> IO ()
 putTextUtf8 = Data.ByteString.putStr . encodeUtf8
@@ -91,15 +96,25 @@ run io ex p = do
 
   pure (exitCode, stdout)
 
-data Git e1 e2 = MkGit GitDir (IOE e1) (Exception String e2)
+data Git e where
+  MkGit ::
+    (e1 :> e, e2 :> e) =>
+    GitDir ->
+    IOE e1 ->
+    Exception String e2 ->
+    Git e
 
 runGit ::
-  (e :> es, e2 :> es) =>
-  Git e e2 ->
+  forall e es.
+  (e :> es) =>
+  Git e ->
   [String] ->
   Eff es (ExitCode, Text)
-runGit (MkGit gitDir io ex) args =
-  run io ex (proc "git" (["-C", unGitDir gitDir] ++ args))
+runGit (MkGit gitDir (io :: IOE e1) (ex :: Exception String e2)) args =
+  inComp @e1 @e @es
+    ( inComp @e2 @e @es
+        (run io ex (proc "git" (["-C", unGitDir gitDir] ++ args)))
+    )
 
 data Before = At !Colored | Before !Colored
 
@@ -171,8 +186,8 @@ parseGitDescribe ex stdout =
     _ -> throw ex "Expected three components separated by dashes"
 
 before ::
-  (e1 :> es, e2 :> es, e3 :> es) =>
-  Git e1 e2 ->
+  (e1 :> es, e3 :> es) =>
+  Git e1 ->
   Exception String e3 ->
   Eff es (Maybe Before)
 before git ex = do
@@ -223,8 +238,8 @@ parseGitDescribeContains ex stdout = do
   pure (mRefType, shortRef, distance)
 
 after ::
-  (e1 :> es, e2 :> es, e3 :> es) =>
-  Git e1 e2 ->
+  (e1 :> es, e3 :> es) =>
+  Git e1 ->
   Exception String e3 ->
   Eff es (Maybe Colored)
 after git ex = do
@@ -249,8 +264,8 @@ headSymbol :: Colored
 headSymbol = Colored Cyan (Plain (fromString "HEAD"))
 
 checkedOutBranch ::
-  (e1 :> es, e2 :> es, e3 :> es) =>
-  Git e1 e2 ->
+  (e1 :> es, e3 :> es) =>
+  Git e1 ->
   Exception String e3 ->
   Eff es (Maybe Colored)
 checkedOutBranch git ex = do
@@ -265,8 +280,8 @@ checkedOutBranch git ex = do
 type Status = Either Colored (Maybe Before, Maybe Colored)
 
 branchStatus ::
-  (e1 :> es, e2 :> es, e3 :> es) =>
-  Git e1 e2 ->
+  (e1 :> es, e3 :> es) =>
+  Git e1 ->
   Exception String e3 ->
   Eff es Status
 branchStatus git ex =
@@ -318,20 +333,26 @@ getArg io ex =
     [one] -> pure one
 
 withGit ::
+  forall j e e1 e2 r.
   (j :> e, e1 :> e, e2 :> e) =>
   FilePath ->
   Jump j ->
   IOE e1 ->
   Exception String e2 ->
-  (Git e1 e2 -> Eff e r) ->
+  (forall eg. Git eg -> Eff (eg :& e) r) ->
   Eff e r
-withGit path notGit io ex h = do
+withGit path notGit io ex h = mergeEff $ do
   gitDir <-
     getGitDir io ex path >>= \case
       Nothing -> jumpTo notGit
       Just gitDir -> pure gitDir
 
   h (MkGit gitDir io ex)
+
+-- FIXME: Replace this with mergeEff from Bluefin.Internal once I've
+-- uploaded the version that contains it to Hackage
+mergeEff :: Eff (e :& e) r -> Eff e r
+mergeEff = unsafeCoerce
 
 main :: IO ()
 main = runEffOrExitFailure $ \io success ex -> do
