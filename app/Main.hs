@@ -325,6 +325,6 @@ main = runEffOrExitFailure $ \io success ex -> do
       Nothing -> jumpTo success
       Just gitDir -> pure gitDir
 
-  status <- branchStatus (MkGit gitDir io ex) ex
+  status <- flip branchStatus ex (MkGit gitDir io ex)
 
   effIO io (putColoredVT100 (renderStatus status))
