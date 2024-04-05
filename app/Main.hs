@@ -2,9 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module Main where
@@ -12,7 +10,6 @@ module Main where
 import Bluefin.Eff (Eff, runEff, (:&), (:>))
 import Bluefin.Exception (Exception, catch, throw)
 import Bluefin.IO (IOE, effIO)
-import Bluefin.Internal (inComp)
 import Bluefin.Jump (Jump, jumpTo, withJump)
 import Control.Applicative ((<|>))
 import Data.ByteString (putStr)
@@ -25,6 +22,7 @@ import System.Exit (ExitCode (ExitFailure, ExitSuccess), exitWith)
 import System.Process.Typed (ProcessConfig, nullStream, proc, readProcess, setStdin)
 import Text.Read (readMaybe)
 import Unsafe.Coerce (unsafeCoerce)
+import Bluefin.Compound (mapHandle)
 
 putTextUtf8 :: Text -> IO ()
 putTextUtf8 = Data.ByteString.putStr . encodeUtf8
@@ -99,15 +97,10 @@ run io ex p = do
 
 data Git e where
   MkGit ::
-    (e1 :> e, e2 :> e) =>
     GitDir ->
-    IOE e1 ->
-    Exception String e2 ->
+    IOE e ->
+    Exception String e ->
     Git e
-
-soupGit :: forall es e. (e :> es) => Git e -> Git es
-soupGit (MkGit gitDir (io :: IOE e1) (ex :: Exception String e2)) =
-  inComp @e1 @e @es (inComp @e2 @e @es (MkGit gitDir io ex))
 
 runGit ::
   forall e es.
@@ -115,7 +108,7 @@ runGit ::
   Git e ->
   [String] ->
   Eff es (ExitCode, Text)
-runGit (soupGit @es -> MkGit gitDir io ex) args =
+runGit (MkGit gitDir io ex) args =
   run io ex (proc "git" (["-C", unGitDir gitDir] ++ args))
 
 data Before = At !Colored | Before !Colored
@@ -349,7 +342,7 @@ withGit path notGit io ex h = mergeEff $ do
       Nothing -> jumpTo notGit
       Just gitDir -> pure gitDir
 
-  h (MkGit gitDir io ex)
+  h (MkGit gitDir (mapHandle io) (mapHandle ex))
 
 -- FIXME: Replace this with mergeEff from Bluefin.Internal once I've
 -- uploaded the version that contains it to Hackage

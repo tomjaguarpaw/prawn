@@ -29,6 +29,6 @@ executable prawn
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
-    build-depends:    base, typed-process, bytestring, text, transformers, bluefin, bluefin-internal
+    build-depends:    base, typed-process, bytestring, text, transformers, bluefin >= 0.0.9.0 && < 0.1
     hs-source-dirs:   app
     default-language: Haskell2010
