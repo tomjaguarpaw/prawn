@@ -317,16 +317,27 @@ getArg io ex =
     (_ : _ : _) -> throw ex "Need exactly one argument"
     [one] -> pure one
 
-main :: IO ()
-main = runEffOrExitFailure $ \io success ex -> do
-  path <- getArg io ex
+withGit ::
+  (j :> e, e1 :> e, e2 :> e) =>
+  FilePath ->
+  Jump j ->
+  IOE e1 ->
+  Exception String e2 ->
+  (Git e1 e2 -> Eff e r) ->
+  Eff e r
+withGit path success io ex h = do
   gitDir <-
     getGitDir io ex path >>= \case
       Nothing -> jumpTo success
       Just gitDir -> pure gitDir
 
+  h (MkGit gitDir io ex)
+
+main :: IO ()
+main = runEffOrExitFailure $ \io success ex -> do
+  path <- getArg io ex
   let h = flip branchStatus ex
 
-  status <- h (MkGit gitDir io ex)
+  status <- withGit path success io ex h
 
   effIO io (putColoredVT100 (renderStatus status))
