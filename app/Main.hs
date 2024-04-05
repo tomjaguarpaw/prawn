@@ -94,8 +94,8 @@ run io ex p = do
 data Git e1 e2 = MkGit GitDir (IOE e1) (Exception String e2)
 
 runGit ::
-  (e1 :> es, e2 :> es) =>
-  Git e1 e2 ->
+  (e :> es, e2 :> es) =>
+  Git e e2 ->
   [String] ->
   Eff es (ExitCode, Text)
 runGit (MkGit gitDir io ex) args =
