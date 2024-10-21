@@ -7,6 +7,7 @@
 
 module Main where
 
+import Bluefin.Compound (mapHandle, useImplIn)
 import Bluefin.Eff (Eff, runEff, (:&), (:>))
 import Bluefin.Exception (Exception, catch, throw)
 import Bluefin.IO (IOE, effIO)
@@ -21,8 +22,6 @@ import System.Environment (getArgs)
 import System.Exit (ExitCode (ExitFailure, ExitSuccess), exitWith)
 import System.Process.Typed (ProcessConfig, nullStream, proc, readProcess, setStdin)
 import Text.Read (readMaybe)
-import Unsafe.Coerce (unsafeCoerce)
-import Bluefin.Compound (mapHandle)
 
 putTextUtf8 :: Text -> IO ()
 putTextUtf8 = Data.ByteString.putStr . encodeUtf8
@@ -336,18 +335,13 @@ withGit ::
   Exception String e2 ->
   (forall eg. Git eg -> Eff (eg :& e) r) ->
   Eff e r
-withGit path notGit io ex h = mergeEff $ do
+withGit path notGit io ex h = do
   gitDir <-
     getGitDir io ex path >>= \case
       Nothing -> jumpTo notGit
       Just gitDir -> pure gitDir
 
-  h (MkGit gitDir (mapHandle io) (mapHandle ex))
-
--- FIXME: Replace this with mergeEff from Bluefin.Internal once I've
--- uploaded the version that contains it to Hackage
-mergeEff :: Eff (e :& e) r -> Eff e r
-mergeEff = unsafeCoerce
+  useImplIn h (MkGit gitDir (mapHandle io) (mapHandle ex))
 
 main :: IO ()
 main = runEffOrExitFailure $ \io success ex -> do
