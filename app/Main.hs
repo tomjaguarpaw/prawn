@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wall #-}
 
@@ -15,6 +16,7 @@ import Bluefin.Jump (Jump, jumpTo, withJump)
 import Control.Applicative ((<|>))
 import Data.ByteString (putStr)
 import Data.ByteString.Lazy (toStrict)
+import Data.Proxy (Proxy (Proxy))
 import Data.String (IsString, fromString)
 import Data.Text (Text, intercalate, split, strip, stripPrefix, unpack)
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
@@ -298,19 +300,21 @@ renderStatus = \case
     (Just (Before b), Just a) -> b <> fromString "-" <> headSymbol <> fromString "-" <> a
 
 runEffOrExitFailure ::
-  ( forall e1 e2 e3 es.
-    IOE e1 ->
-    Jump e2 ->
-    Exception String e3 ->
-    Eff (e2 :& e3 :& e1 :& es) ()
+  ( forall e es.
+    IOE e ->
+    Jump e ->
+    Exception String e ->
+    Eff (e :& es) ()
   ) ->
   IO r
 runEffOrExitFailure f = runEff $ \io -> do
+  Proxy :: Proxy (e :& es) <- effType
+
   r <-
     catch
       ( \ex -> do
           withJump $ \success ->
-            f io success ex
+            useImplIn' @es (f (mapHandle io) (mapHandle success) (mapHandle ex))
           pure ExitSuccess
       )
       ( \l -> effIO io $ do
@@ -318,6 +322,14 @@ runEffOrExitFailure f = runEff $ \io -> do
           pure (ExitFailure 1)
       )
   effIO io (exitWith r)
+
+-- This should probably be in Bluefin
+effType :: Eff es (Proxy es)
+effType = pure Proxy
+
+-- This should probably be in Bluefin
+useImplIn' :: (e :> es) => Eff (es :& e) r -> Eff es r
+useImplIn' = ($ ()) . useImplIn . const
 
 getArg :: (e :> es, ex :> es) => IOE e -> Exception String ex -> Eff es String
 getArg io ex =
